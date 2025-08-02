@@ -15,6 +15,7 @@ import asyncio
 import platform
 import zipfile
 
+
 class ExitCodes():
     'Exit codes'
     Success = 0
@@ -25,9 +26,11 @@ class ExitCodes():
     MissingDependency = 129
     UserInterrupt = 254
 
+
 def info(*args, **kwargs):
     'Just `print` to `stdout`'
     print(*args, **kwargs, file=sys.stdout, flush=True)
+
 
 def error(*args, exception=None, **kwargs):
     '`print` to `stderr`, or optionally raise an exception'
@@ -36,6 +39,7 @@ def error(*args, exception=None, **kwargs):
     else:
         print(*args, **kwargs, file=sys.stderr, flush=True)
 
+
 def fatal(*args, code=ExitCodes.GeneralError, **kwargs):
     '`print` to `stderr`, and exit with `code`'
     print(*args, **kwargs, file=sys.stderr, flush=True)
@@ -43,11 +47,12 @@ def fatal(*args, code=ExitCodes.GeneralError, **kwargs):
 
 # Do i18n first
 
+
 try:
     from printer_lib.i18n import I18nLib
     for path in ('www/lang', 'lang'):
-        if os.path.exists(path):
-            i18n = I18nLib(path).translate
+        if os.path.exists("src/"+path):
+            i18n = I18nLib("src/"+path).translate
             break
     else:   # if didn't break
         error('Warning: No languages were found', exception=None)
@@ -99,6 +104,7 @@ except ImportError:
 
 # Helpers
 
+
 def flip(buffer, width, height, horizontally=False, vertically=True, *, overwrite=False):
     'Flip the bitmap data'
     buffer.seek(0)
@@ -137,10 +143,12 @@ class PrinterError(Exception):
     'Exception raised when something went wrong during printing'
     message: str
     message_localized: str
+
     def __init__(self, *args):
         super().__init__(*args)
         self.message = args[0]
         self.message_localized = i18n(*args)
+
 
 class PrinterData():
     ''' The image data to be used by `PrinterDriver`.
@@ -165,7 +173,7 @@ class PrinterData():
     full: bool
     'Whether the data is full (i.e. have reached max size)'
 
-    def __init__(self, width, file: io.BufferedIOBase=None, max_size=64 * 1024 * 1024):
+    def __init__(self, width, file: io.BufferedIOBase = None, max_size=64 * 1024 * 1024):
         self.width = width
         self._data_width = width // 8
         self.height = 0
@@ -264,6 +272,7 @@ class PrinterData():
 
 # The driver
 
+
 class PrinterDriver(Commander):
     'The core driver of Cat-Printer'
 
@@ -275,7 +284,7 @@ class PrinterDriver(Commander):
 
     scan_time: float = 4.0
 
-    connection_timeout : float = 5.0
+    connection_timeout: float = 5.0
 
     font_family: str = 'font'
 
@@ -334,7 +343,7 @@ class PrinterDriver(Commander):
         if self.fake:
             return
         if (self.device is not None and address is not None and
-            (self.device.address.lower() == address.lower())):
+                (self.device.address.lower() == address.lower())):
             return
         try:
             if self.device is not None and self.device.is_connected:
@@ -348,6 +357,7 @@ class PrinterDriver(Commander):
             return
         self.model = Models.get(name, Models['_ZZ00'])
         self.device = BleakClient(address)
+
         def notify(_char, data):
             if data == self.data_flow_pause:
                 self._paused = True
@@ -358,7 +368,7 @@ class PrinterDriver(Commander):
             self.device.start_notify(self.rx_characteristic, notify)
         )
 
-    def scan(self, identifier: str=None, *, use_result=False, everything=False):
+    def scan(self, identifier: str = None, *, use_result=False, everything=False):
         ''' Scan for supported devices, optionally filter with `identifier`,
             which can be device model (bluetooth name), and optionally MAC address, after a comma.
             If `use_result` is True, connect to the first available device to driver instantly.
@@ -375,7 +385,8 @@ class PrinterDriver(Commander):
             if identifier.find(',') != -1:
                 name, address = identifier.split(',')
                 if name not in Models:
-                    error('model-0-is-not-supported-yet', name, exception=PrinterError)
+                    error('model-0-is-not-supported-yet',
+                          name, exception=PrinterError)
                 # TODO: is this logic correct?
                 if address[2::3] != ':::::' and len(address.replace('-', '')) != 32:
                     error('invalid-address-0', address, exception=PrinterError)
@@ -383,8 +394,9 @@ class PrinterDriver(Commander):
                     self.connect(name, address)
                 return [BLEDevice(address, name)]
             if (identifier not in Models and
-                identifier[2::3] != ':::::' and len(identifier.replace('-', '')) != 32):
-                error('model-0-is-not-supported-yet', identifier, exception=PrinterError)
+                    identifier[2::3] != ':::::' and len(identifier.replace('-', '')) != 32):
+                error('model-0-is-not-supported-yet',
+                      identifier, exception=PrinterError)
         # scanner = BleakScanner()
         devices = [x for x in self.loop(
             BleakScanner.discover(self.scan_time)
@@ -393,13 +405,14 @@ class PrinterDriver(Commander):
             if identifier in Models:
                 devices = [dev for dev in devices if dev.name == identifier]
             else:
-                devices = [dev for dev in devices if dev.address.lower() == identifier.lower()]
+                devices = [dev for dev in devices if dev.address.lower()
+                           == identifier.lower()]
         if use_result and len(devices) != 0:
             self.connect(devices[0].name, devices[0].address)
         return devices
 
     def print(self, file: io.BufferedIOBase, *, mode='default',
-              identifier: str=None):
+              identifier: str = None):
         ''' Print data of `file`.
             Currently, available modes are `pbm` and `text`.
             If no devices were connected, scan & connect to one first.
@@ -415,7 +428,7 @@ class PrinterDriver(Commander):
         elif mode == 'text':
             self._print_text(file)
         else:
-            ... # TODO: other?
+            ...  # TODO: other?
 
     def flush(self):
         'Send pending data instantly, but will block if paused'
@@ -474,7 +487,8 @@ class PrinterDriver(Commander):
 
     def _print_bitmap(self, data: PrinterData):
         paper_width = self.model.paper_width
-        flip(data.data, data.width, data.height, self.flip_h, self.flip_v, overwrite=True)
+        flip(data.data, data.width, data.height,
+             self.flip_h, self.flip_v, overwrite=True)
         self._prepare()
         # TODO: consider compression on new devices
         for chunk in data.read(paper_width // 8):
@@ -498,7 +512,7 @@ class PrinterDriver(Commander):
             if os.path.exists(full_path := os.path.join(parent, path)):
                 file = open(full_path, 'rb')
                 break
-        else: # if didn't break
+        else:  # if didn't break
             if os.path.exists('pf2.zip'):
                 with zipfile.ZipFile('pf2.zip') as pf2zip:
                     for name in pf2zip.namelist():
@@ -513,10 +527,11 @@ class PrinterDriver(Commander):
         text_io = io.TextIOWrapper(file, encoding='utf-8')
         if self.text_canvas is None:
             self.text_canvas = TextCanvas(paper_width, wrap=self.wrap,
-                    rtl=self.rtl, font_path=self.font_family + '.pf2',
-                    font_data_io=self._get_pf2(self.font_family), scale=self.font_scale)
+                                          rtl=self.rtl, font_path=self.font_family + '.pf2',
+                                          font_data_io=self._get_pf2(self.font_family), scale=self.font_scale)
             if self.text_canvas.broken:
-                error(i18n('pf2-font-not-found-or-broken-0', self.font_family), exception=PrinterError)
+                error(i18n('pf2-font-not-found-or-broken-0',
+                      self.font_family), exception=PrinterError)
         # with stdin you maybe trying out a typewriter
         # so print a "ruler", indicating max characters in one line
         if file is sys.stdin.buffer:
@@ -534,10 +549,10 @@ class PrinterDriver(Commander):
             else:
                 # variable width, use a rough average
                 average = (width_stats['a'] + width_stats['A'] +
-                        width_stats['0'] + width_stats['+']) // 4
+                           width_stats['0'] + width_stats['+']) // 4
             # ruler
             info('-------+' * (paper_width // average // 8) +
-                    '-' * (paper_width // average % 8))
+                 '-' * (paper_width // average % 8))
         self._prepare()
         printer_data = PrinterData(paper_width)
         buffer = io.BytesIO()
@@ -550,7 +565,7 @@ class PrinterDriver(Commander):
                     buffer.write(data)
                     line_count += 1
                 flip(buffer, self.text_canvas.width, self.text_canvas.height * line_count,
-                        self.flip_h, self.flip_v, overwrite=True)
+                     self.flip_h, self.flip_v, overwrite=True)
                 while chunk := buffer.read(paper_width // 8):
                     printer_data.write(chunk)
                     if self.dry_run:
@@ -584,6 +599,7 @@ class PrinterDriver(Commander):
 
 # CLI procedure
 
+
 def fallback_program(*programs):
     'Return first specified program that exists in PATH'
     for i in os.environ['PATH'].split(os.pathsep):
@@ -592,7 +608,9 @@ def fallback_program(*programs):
                 return j
     return None
 
+
 _MagickExe = fallback_program('magick', 'magick.exe', 'convert', 'convert.exe')
+
 
 def magick_text(stdin, image_width, font_size, font_family):
     'Pipe an io to ImageMagick for processing text to image, return output io'
@@ -601,10 +619,11 @@ def magick_text(stdin, image_width, font_size, font_family):
 
     read_fd, write_fd = os.pipe()
     subprocess.Popen([_MagickExe, '-background', 'white', '-fill', 'black',
-            '-size', f'{image_width}x', '-font', font_family, '-pointsize',
-            str(font_size), 'caption:@-', 'pbm:-'],
-            stdin=stdin, stdout=io.FileIO(write_fd, 'w'))
+                      '-size', f'{image_width}x', '-font', font_family, '-pointsize',
+                      str(font_size), 'caption:@-', 'pbm:-'],
+                     stdin=stdin, stdout=io.FileIO(write_fd, 'w'))
     return io.FileIO(read_fd, 'r')
+
 
 def magick_image(stdin, image_width, dither):
     'Pipe an io to ImageMagick for processing "usual" image to pbm, return output io'
@@ -613,9 +632,10 @@ def magick_image(stdin, image_width, dither):
 
     read_fd, write_fd = os.pipe()
     subprocess.Popen([_MagickExe, '-', '-fill', 'white', '-opaque', 'transparent',
-            '-resize', f'{image_width}x', '-dither', dither, '-monochrome', 'pbm:-'],
-            stdin=stdin, stdout=io.FileIO(write_fd, 'w'))
+                      '-resize', f'{image_width}x', '-dither', dither, '-monochrome', 'pbm:-'],
+                     stdin=stdin, stdout=io.FileIO(write_fd, 'w'))
     return io.FileIO(read_fd, 'r')
+
 
 class HelpFormatterI18n(argparse.HelpFormatter):
     'How dare the author of this thing hardcode strings and a colon?'
@@ -631,6 +651,7 @@ class HelpFormatterI18n(argparse.HelpFormatter):
 
     def _format_usage(self, usage, actions, groups, prefix=None):
         return super()._format_usage(usage, actions, groups, i18n('usage-'))
+
 
 class ArgumentParserI18n(argparse.ArgumentParser):
     'For using our i18n instead of gettext'
@@ -648,10 +669,13 @@ class ArgumentParserI18n(argparse.ArgumentParser):
             kwargs['required'] = False
         super().add_argument(*args, **kwargs)
 
+
 Printer = None
+
 
 def _main():
     'Main routine for direct command line execution'
+    print('Cat-Printer', i18n('version'), 'by NaitLee Soft')
     parser = ArgumentParserI18n(
         description='  '.join([
             i18n('print-to-cat-printer'),
@@ -661,33 +685,33 @@ def _main():
     )
     # TODO: group some switches to dedicated help
     parser.add_argument('-h', '--help', action='store_true',
-            help=i18n('show-this-help-message'))
+                        help=i18n('show-this-help-message'))
     parser.add_argument('file', default='-', metavar='File', type=str,
-            help=i18n('path-to-input-file-dash-for-stdin'))
+                        help=i18n('path-to-input-file-dash-for-stdin'))
     parser.add_argument('-s', '--scan', metavar='Time[,XY01[,MacAddress]]', default='4', type=str,
-            help=i18n('scan-for-a-printer'))
+                        help=i18n('scan-for-a-printer'))
     parser.add_argument('-c', '--convert', metavar='text|image', type=str, default='',
-            help=i18n('convert-input-image-with-imagemagick'))
+                        help=i18n('convert-input-image-with-imagemagick'))
     parser.add_argument('-p', '--image', metavar='flip|fliph|flipv', type=str, default='',
-            help=i18n('image-printing-options'))
+                        help=i18n('image-printing-options'))
     parser.add_argument('-t', '--text', metavar='Size[,FontFamily][,pf2][,nowrap][,rtl]', type=str,
-            default='', help=i18n('text-printing-mode-with-options'))
+                        default='', help=i18n('text-printing-mode-with-options'))
     parser.add_argument('-e', '--energy', metavar='0.0-1.0', type=float, default=None,
-            help=i18n('control-printer-thermal-strength'))
+                        help=i18n('control-printer-thermal-strength'))
     parser.add_argument('-q', '--quality', metavar='1-4', type=int, default=3,
-            help=i18n('print-quality'))
+                        help=i18n('print-quality'))
     parser.add_argument('-d', '--dry', action='store_true',
-            help=i18n('dry-run-test-print-process-only'))
+                        help=i18n('dry-run-test-print-process-only'))
     parser.add_argument('-u', '--unknown', action='store_true',
-            help=i18n('try-to-print-through-an-unknown-device'))
+                        help=i18n('try-to-print-through-an-unknown-device'))
     parser.add_argument('-0', '--0th', action='store_true',
-            help=i18n('no-prompt-for-multiple-devices'))
+                        help=i18n('no-prompt-for-multiple-devices'))
     parser.add_argument('-f', '--fake', metavar='XY01', type=str, default='',
-            help=i18n('virtual-run-on-specified-model'))
+                        help=i18n('virtual-run-on-specified-model'))
     parser.add_argument('-m', '--dump', action='store_true',
-            help=i18n('dump-traffic'))
+                        help=i18n('dump-traffic'))
     parser.add_argument('-n', '--nothing', action='store_true',
-            help=i18n('do-nothing'))
+                        help=i18n('do-nothing'))
 
     if len(sys.argv) < 2 or '-h' in sys.argv or '--help' in sys.argv:
         parser.print_help()
@@ -779,7 +803,7 @@ def _main():
         printer.font_family = font_family or 'font'
         if 'pf2' not in text_param:
             file = magick_text(file, printer.model.paper_width,
-                    font_size, font_family)
+                               font_size, font_family)
         else:
             printer.font_scale = font_size
             mode = 'text'
@@ -796,6 +820,7 @@ def _main():
     finally:
         file.close()
         printer.unload()
+
 
 def main():
     'Run the `_main` routine while catching exceptions'
@@ -821,6 +846,7 @@ def main():
             raise
     except KeyboardInterrupt:
         fatal(i18n('stopping'), code=ExitCodes.UserInterrupt)
+
 
 if __name__ == '__main__':
     main()

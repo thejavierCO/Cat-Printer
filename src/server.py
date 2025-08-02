@@ -32,15 +32,18 @@ IsAndroid = (os.environ.get("P4A_BOOTSTRAP") is not None)
 
 
 class DictAsObject(dict):
-    """ Let you use a dict like an object in JavaScript.
-    """
+    " Let you use a dict like an object in JavaScript. "
+
     def __getattr__(self, key):
         return self.get(key, None)
+
     def __setattr__(self, key, value):
         self[key] = value
 
+
 class PrinterServerError(PrinterError):
     'Error of PrinterServer'
+
 
 mime_type = {
     'html': 'text/html;charset=utf-8',
@@ -53,9 +56,12 @@ mime_type = {
     'wasm': 'application/wasm',
     'octet-stream': 'application/octet-stream'
 }
+
+
 def mime(url: str):
     'Get pre-defined MIME type of a certain url by extension name'
     return mime_type.get(url.rsplit('.', 1)[-1], mime_type['octet-stream'])
+
 
 def concat_files(*paths, prefix_format='', buffer=4 * 1024 * 1024) -> bytes:
     'Generator, that yields buffered file content, with optional prefix'
@@ -65,13 +71,12 @@ def concat_files(*paths, prefix_format='', buffer=4 * 1024 * 1024) -> bytes:
             while data := file.read(buffer):
                 yield data
 
+
 class PrinterServerHandler(BaseHTTPRequestHandler):
     '(Local) server handler for Cat Printer Web interface'
 
     buffer = 4 * 1024 * 1024
-
     max_payload = buffer * 16
-
     settings = DictAsObject({
         'config_path': 'config.json',
         'version': 4,
@@ -86,9 +91,7 @@ class PrinterServerHandler(BaseHTTPRequestHandler):
         'printer', 'is_android'
     )
     all_script: list = []
-
     printer: PrinterDriver = PrinterDriver()
-
     ipp: IPP = None
 
     def log_request(self, _code=200, _size=0):
@@ -107,6 +110,7 @@ class PrinterServerHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         'Called when server got a GET http request'
+        print('GET', self.path)
         # prepare
         path, _, _args = self.path.partition('?')
         if '/..' in path or '../' in path:
@@ -123,7 +127,7 @@ class PrinterServerHandler(BaseHTTPRequestHandler):
                 for data in concat_files(*(self.all_script), prefix_format='\n// {0}\n'):
                     self.wfile.write(data)
                 return
-        path = 'www' + path
+        path = './src/www' + path
         # not found
         if not os.path.isfile(path):
             self.send_response(404)
@@ -174,7 +178,7 @@ class PrinterServerHandler(BaseHTTPRequestHandler):
             with open(self.settings.config_path, 'r', encoding='utf-8') as file:
                 settings = DictAsObject(json.load(file))
                 if (settings.version is None or
-                    settings.version < self.settings.version):
+                        settings.version < self.settings.version):
                     # Version too old, start over
                     # TODO: selective?
                     self.save_config()
@@ -217,7 +221,9 @@ class PrinterServerHandler(BaseHTTPRequestHandler):
         if api == 'print':
             self.update_printer()
             self.printer.print(io.BytesIO(body))
-            self.api_success()
+            self.api_success({"status": "ok", "data": "Printed successfully"})
+            with open('img.pbm', 'a', encoding='utf-8') as file:
+                file.write(body.decode('utf-8'))
             return
         data = DictAsObject(json.loads(body))
         if api == 'devices':
@@ -226,13 +232,13 @@ class PrinterServerHandler(BaseHTTPRequestHandler):
                 'name': device.name,
                 'address': device.address
             } for device in self.printer.scan(everything=data.get('everything'))]
-            self.api_success({
-                'devices': devices_list
-            })
+            self.api_success({'devices': devices_list})
+            print('Devices found:', devices_list)
             return
         if api == 'query':
             self.load_config()
             self.api_success(self.settings)
+            print('Settings:', self.settings)
             return
         if api == 'set':
             for key in data:
@@ -240,14 +246,20 @@ class PrinterServerHandler(BaseHTTPRequestHandler):
             self.save_config()
             self.update_printer()
             self.api_success()
+            print('Settings updated:', self.settings)
             return
         if api == 'connect':
             name, address = data['device'].split(',')
             self.printer.connect(name, address)
-            self.api_success()
+            self.api_success({
+                'status': 'ok',
+                'data': 'Connected to {} at {}'.format(name, address)
+            })
+            print('Connected to {} at {}'.format(name, address))
         if api == 'exit':
             self.api_success()
             self.exit()
+            print('Exiting...')
 
     def exit(self):
         'Stop correctly & cleanly'
@@ -259,8 +271,8 @@ class PrinterServerHandler(BaseHTTPRequestHandler):
         'Called when server got a POST http request'
         content_length = int(self.headers.get('Content-Length', -1))
         if (content_length < -1 or
-            content_length > self.max_payload
-        ):
+                content_length > self.max_payload
+            ):
             return
         if self.headers.get('Content-Type') == 'application/ipp':
             if self.ipp is None:
@@ -268,6 +280,7 @@ class PrinterServerHandler(BaseHTTPRequestHandler):
             self.ipp.handle_ipp()
             return
         try:
+            print('POST', self.path)
             self.handle_api()
             return
         except BleakDBusError as e:
@@ -304,6 +317,7 @@ class PrinterServerHandler(BaseHTTPRequestHandler):
             })
             raise
 
+
 class PrinterServer(HTTPServer):
     ''' (local) server for Cat Printer Web Interface
         The reason to override is to only init the handler once,
@@ -324,7 +338,8 @@ class PrinterServer(HTTPServer):
             with open(os.path.join('www', 'all-scripts.txt'), 'r', encoding='utf-8') as file:
                 for path in file.read().split('\n'):
                     if path != '':
-                        self.handler.all_script.append(os.path.join('www', path))
+                        self.handler.all_script.append(
+                            os.path.join('www', path))
             return
         self.handler.__init__(request, client_address, self)
 
@@ -341,9 +356,9 @@ def serve():
     if '-a' in sys.argv:
         info(i18n('will-listen-on-all-addresses'))
         listen_all = True
-    server = PrinterServer(('' if listen_all else address, port), PrinterServerHandler)
+    server = PrinterServer(
+        ('' if listen_all else address, port), PrinterServerHandler)
     service_url = f'http://{address}:{port}/'
-    
 
     info(i18n('serving-at-0', service_url))
     if '-s' not in sys.argv and not IsAndroid:
@@ -352,18 +367,21 @@ def serve():
     if IsAndroid:
         from android.permissions import request_permissions, Permission
         try:
-            request_permissions([Permission.BLUETOOTH_SCAN, Permission.BLUETOOTH_CONNECT])
+            request_permissions(
+                [Permission.BLUETOOTH_SCAN, Permission.BLUETOOTH_CONNECT])
         except Exception:
-            print('Exception on requesting Android Permissions. Continuing', file=sys.stderr)
+            print(
+                'Exception on requesting Android Permissions. Continuing', file=sys.stderr)
             pass
         from android.app import Activity
         from android.content import Intent
         print(Intent.getIntent().getType())
-    
+
     try:
         server.serve_forever()
     except KeyboardInterrupt:
         server.server_close()
+
 
 if __name__ == '__main__':
     serve()
