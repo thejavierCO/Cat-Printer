@@ -74,7 +74,6 @@ def concat_files(*paths, prefix_format='', buffer=4 * 1024 * 1024) -> bytes:
 
 class PrinterServerHandler(BaseHTTPRequestHandler):
     '(Local) server handler for Cat Printer Web interface'
-
     buffer = 4 * 1024 * 1024
     max_payload = buffer * 16
     settings = DictAsObject({
@@ -218,12 +217,12 @@ class PrinterServerHandler(BaseHTTPRequestHandler):
         content_length = int(self.headers.get('Content-Length'))
         body = self.rfile.read(content_length)
         api = self.path[1:]
+        print('API', api)
         if api == 'print':
             self.update_printer()
             self.printer.print(io.BytesIO(body))
             self.api_success({"status": "ok", "data": "Printed successfully"})
-            with open('img.pbm', 'a', encoding='utf-8') as file:
-                file.write(body.decode('utf-8'))
+            print('with body:', body.decode('utf-8', errors='replace'))
             return
         data = DictAsObject(json.loads(body))
         if api == 'devices':
@@ -234,11 +233,13 @@ class PrinterServerHandler(BaseHTTPRequestHandler):
             } for device in self.printer.scan(everything=data.get('everything'))]
             self.api_success({'devices': devices_list})
             print('Devices found:', devices_list)
+            print('with body:', body.decode('utf-8', errors='replace'))
             return
         if api == 'query':
             self.load_config()
             self.api_success(self.settings)
             print('Settings:', self.settings)
+            print('with body:', body.decode('utf-8', errors='replace'))
             return
         if api == 'set':
             for key in data:
@@ -247,6 +248,7 @@ class PrinterServerHandler(BaseHTTPRequestHandler):
             self.update_printer()
             self.api_success()
             print('Settings updated:', self.settings)
+            print('with body:', body.decode('utf-8', errors='replace'))
             return
         if api == 'connect':
             name, address = data['device'].split(',')
@@ -256,6 +258,7 @@ class PrinterServerHandler(BaseHTTPRequestHandler):
                 'data': 'Connected to {} at {}'.format(name, address)
             })
             print('Connected to {} at {}'.format(name, address))
+            print('with body:', body.decode('utf-8', errors='replace'))
         if api == 'exit':
             self.api_success()
             self.exit()
@@ -272,7 +275,7 @@ class PrinterServerHandler(BaseHTTPRequestHandler):
         content_length = int(self.headers.get('Content-Length', -1))
         if (content_length < -1 or
                 content_length > self.max_payload
-            ):
+                ):
             return
         if self.headers.get('Content-Type') == 'application/ipp':
             if self.ipp is None:
@@ -335,11 +338,11 @@ class PrinterServer(HTTPServer):
         if self.handler is None:
             self.handler = self.handler_class(request, client_address, self)
             self.handler.load_config()
-            with open(os.path.join('www', 'all-scripts.txt'), 'r', encoding='utf-8') as file:
+            with open(os.path.join('src', 'www', 'all-scripts.txt'), 'r', encoding='utf-8') as file:
                 for path in file.read().split('\n'):
                     if path != '':
                         self.handler.all_script.append(
-                            os.path.join('www', path))
+                            os.path.join('src', 'www', path))
             return
         self.handler.__init__(request, client_address, self)
 
