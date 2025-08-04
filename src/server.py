@@ -94,6 +94,8 @@ class PrinterServerHandler(BaseHTTPRequestHandler):
     ipp: IPP = None
 
     def log_request(self, _code=200, _size=0):
+        if '-D' in sys.argv or '--debug' in sys.argv:
+            print(f'{self.command} {self.path} {_code} ')
         pass
 
     def log_error(self, *_args):
@@ -109,11 +111,10 @@ class PrinterServerHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         'Called when server got a GET http request'
-        print('GET', self.path)
         # prepare
         path, _, _args = self.path.partition('?')
         if '/..' in path or '../' in path:
-            return
+            return path
         if path == '/':
             path += 'index.html'
         # special
@@ -125,14 +126,14 @@ class PrinterServerHandler(BaseHTTPRequestHandler):
                 self.end_headers()
                 for data in concat_files(*(self.all_script), prefix_format='\n// {0}\n'):
                     self.wfile.write(data)
-                return
+                return path
         path = './src/www' + path
         # not found
         if not os.path.isfile(path):
             self.send_response(404)
             self.send_header('Content-Type', mime('txt'))
             self.end_headers()
-            return
+            return '404 Not Found'
         # static
         self.send_response(200)
         self.send_header('Content-Type', mime(path))
@@ -143,7 +144,7 @@ class PrinterServerHandler(BaseHTTPRequestHandler):
                 chunk = file.read(self.buffer)
                 if not self.wfile.write(chunk):
                     break
-        return
+        return path
 
     def api_success(self, body_json=None):
         'Called when an API call is being considered successful'
@@ -217,12 +218,10 @@ class PrinterServerHandler(BaseHTTPRequestHandler):
         content_length = int(self.headers.get('Content-Length'))
         body = self.rfile.read(content_length)
         api = self.path[1:]
-        print('API', api)
         if api == 'print':
             self.update_printer()
             self.printer.print(io.BytesIO(body))
             self.api_success({"status": "ok", "data": "Printed successfully"})
-            print('with body:', body.decode('utf-8', errors='replace'))
             return
         data = DictAsObject(json.loads(body))
         if api == 'devices':
@@ -232,14 +231,10 @@ class PrinterServerHandler(BaseHTTPRequestHandler):
                 'address': device.address
             } for device in self.printer.scan(everything=data.get('everything'))]
             self.api_success({'devices': devices_list})
-            print('Devices found:', devices_list)
-            print('with body:', body.decode('utf-8', errors='replace'))
             return
         if api == 'query':
             self.load_config()
             self.api_success(self.settings)
-            print('Settings:', self.settings)
-            print('with body:', body.decode('utf-8', errors='replace'))
             return
         if api == 'set':
             for key in data:
@@ -247,22 +242,18 @@ class PrinterServerHandler(BaseHTTPRequestHandler):
             self.save_config()
             self.update_printer()
             self.api_success()
-            print('Settings updated:', self.settings)
-            print('with body:', body.decode('utf-8', errors='replace'))
             return
         if api == 'connect':
             name, address = data['device'].split(',')
-            self.printer.connect(name, address)
+            print(self.printer.connect(name, address))
             self.api_success({
                 'status': 'ok',
                 'data': 'Connected to {} at {}'.format(name, address)
             })
-            print('Connected to {} at {}'.format(name, address))
-            print('with body:', body.decode('utf-8', errors='replace'))
+            return
         if api == 'exit':
             self.api_success()
             self.exit()
-            print('Exiting...')
 
     def exit(self):
         'Stop correctly & cleanly'
@@ -283,7 +274,6 @@ class PrinterServerHandler(BaseHTTPRequestHandler):
             self.ipp.handle_ipp()
             return
         try:
-            print('POST', self.path)
             self.handle_api()
             return
         except BleakDBusError as e:
