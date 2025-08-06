@@ -17,17 +17,13 @@ import webbrowser
 
 # For now we can't use `ThreadingHTTPServer`
 from http.server import HTTPServer, BaseHTTPRequestHandler
-
 # import `printer` first, to diagnostic some common errors
 from printer import PrinterDriver, PrinterError, i18n, info
-
 from bleak.exc import BleakDBusError, BleakError    # pylint: disable=wrong-import-order
-
 from printer_lib.ipp import IPP
-
 # Supress non-sense asyncio warnings
-warnings.simplefilter('ignore', RuntimeWarning, 0, True)
 
+warnings.simplefilter('ignore', RuntimeWarning, 0, True)
 IsAndroid = (os.environ.get("P4A_BOOTSTRAP") is not None)
 
 
@@ -245,12 +241,27 @@ class PrinterServerHandler(BaseHTTPRequestHandler):
             return
         if api == 'connect':
             name, address = data['device'].split(',')
-            print(self.printer.connect(name, address))
-            self.api_success({
-                'status': 'ok',
-                'data': 'Connected to {} at {}'.format(name, address)
-            })
-            return
+            if not name or not address:
+                self.api_fail({
+                    'name': 'InvalidDevice',
+                    'details': 'Device name or address is empty'
+                })
+                return
+            if self.printer.device is None:
+                self.printer.connect(name, address)
+                self.api_success({
+                    'status': 'ok',
+                    'data': 'Connected to {} at {}'.format(name, address)
+                })
+                return
+            else:
+                self.printer.connect(name, address)
+                self.api_success({
+                    'status': 'ok',
+                    'data': 'Reconnected to {} at {}'.format(name, address)
+                })
+                return
+
         if api == 'exit':
             self.api_success()
             self.exit()
@@ -265,8 +276,8 @@ class PrinterServerHandler(BaseHTTPRequestHandler):
         'Called when server got a POST http request'
         content_length = int(self.headers.get('Content-Length', -1))
         if (content_length < -1 or
-                content_length > self.max_payload
-                ):
+            content_length > self.max_payload
+            ):
             return
         if self.headers.get('Content-Type') == 'application/ipp':
             if self.ipp is None:
@@ -308,6 +319,8 @@ class PrinterServerHandler(BaseHTTPRequestHandler):
                 'name': 'Exception',
                 'details': str(e)
             })
+        except TypeError as e:
+            # TypeError is raised when the request is not JSON
             raise
 
 
