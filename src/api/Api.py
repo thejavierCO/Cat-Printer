@@ -60,7 +60,10 @@ class ServerPathHandler():
         if path in self.paths:
             handler, expected_method = self.paths[path]
             if method == expected_method:
-                return handler(request)
+                if callable(handler):
+                    return handler(request)
+                if isinstance(handler, str):
+                    return request.send(200, handler)
             else:
                 return request.send(405, f"Method {method} not allowed for {path}")
         if path.startswith("/"):
@@ -190,7 +193,14 @@ if __name__ == "__main__":
         httpd = Server(('localhost', 8000), ServerHandler)
         httpd.useStatic("./www")
         httpd.setGet("/~every.js", lambda res: compress(res, "/~every.js"))
-        httpd.setPost("/query")
+        httpd.setPost("/print", "play")
+        httpd.setPost("/devices", "play")
+        httpd.setPost("/query", "play")
+        httpd.setPost("/set", "play")
+        httpd.setPost("/connect", "play")
+        httpd.setPost("/exit", lambda res: sys.exit(0))
+        httpd.setGet(
+            "/exit", lambda res: (res.send(200, "close"), sys.exit(0)))
         httpd.start()
     except KeyboardInterrupt:
         print("Server stopped by user.")
