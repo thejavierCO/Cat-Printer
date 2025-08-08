@@ -23,6 +23,16 @@ mime_type = {
 }
 
 
+class DictAsObject(dict):
+    " Let you use a dict like an object in JavaScript. "
+
+    def __getattr__(self, key):
+        return self.get(key, None)
+
+    def __setattr__(self, key, value):
+        self[key] = value
+
+
 def mime(url: str):
     return mime_type.get(url.rsplit('.', 1)[-1], mime_type['octet-stream'])
 
@@ -42,20 +52,21 @@ class ServerPathHandler():
         return self
 
     def handle_request(self, request, method, path):
-        print("haosdhio")
-        # if self.homedir != "":
-        #     file_path = os.path.abspath(self.homedir+path)
-        #     if os.path.isfile(file_path):
-        #         return request.sendFileFormDirectory(200, file_path)
-        #     if path.startswith("/"):
-        #         return request.sendFile(200, os.path.abspath(file_path+"/index.html"))
-        # if path in self.paths:
-        #     handler, expected_method = self.paths[path]
-        #     if method == expected_method:
-        #         print(handler(request))
-        #     else:
-        #         request.send(405, f"Method {method} not allowed for {path}")
-        request.send(404, "Path Not Found")
+        path, _, _args = path.partition('?')
+        if self.homedir != "":
+            file_path = os.path.abspath(self.homedir+path)
+            if os.path.isfile(file_path):
+                return request.sendFileFormDirectory(200, file_path)
+        if path in self.paths:
+            handler, expected_method = self.paths[path]
+            if method == expected_method:
+                return handler(request)
+            else:
+                return request.send(405, f"Method {method} not allowed for {path}")
+        if path.startswith("/"):
+            return request.sendFileFormDirectory(
+                200, os.path.abspath(file_path+"/index.html"))
+        return request.send(404, "Path Not Found")
 
 
 class ServerHandler(BaseHTTPRequestHandler):
@@ -72,21 +83,17 @@ class ServerHandler(BaseHTTPRequestHandler):
         return self
 
     def sendFileFormDirectory(self, status_code, file_path):
-        print(file_path)
         if not os.path.isfile(file_path):
             return self.send(404, "Page Not Fount")
-        print("exist")
         self.send_response(status_code)
         self.send_header('Content-type', mime(file_path))
         self.end_headers()
-        print("open")
         file_data = open(file_path, 'rb')
         while True:
             chunk = file_data.read(self.buffer)
             if not self.wfile.write(chunk):
                 break
         file_data.close()
-        print("close")
         return lambda data: print("load file exist")
 
     def sendFile(self, status_code, file_path):
@@ -120,13 +127,12 @@ class ServerHandler(BaseHTTPRequestHandler):
 class Server(HTTPServer):
     def finish_request(self, request, client_address):
         try:
-            print("request")
             self.RequestHandlerClass(request, client_address, self)
         except Exception as e:
             print(f"Error handling request: {str(e)}")
             request.close()
 
-    def useHome(self, directory):
+    def useStatic(self, directory):
         self.RequestHandlerClass.server_path_handler.homedir = directory
 
     def setGet(self, path, handler):
@@ -160,17 +166,17 @@ if __name__ == "__main__":
         all_script: list = []
         txtpath = os.path.abspath(os.path.join('www', 'all-scripts.txt'))
 
-        # def concat_files(*paths, prefix_format='', buffer=4 * 1024 * 1024) -> bytes:
-        #     for path in paths:
-        #         yield prefix_format.format(path).encode('utf-8')
-        #         with open(path, 'rb') as file:
-        #             while data := file.read(buffer):
-        #                 yield data
+        def concat_files(*paths, prefix_format='', buffer=4 * 1024 * 1024) -> bytes:
+            for path in paths:
+                yield prefix_format.format(path).encode('utf-8')
+                with open(path, 'rb') as file:
+                    while data := file.read(buffer):
+                        yield data
 
-        # def compress(res, name):
-        #     wfile = res.sendFile(200, name)
-        #     for data in concat_files(*(all_script), prefix_format='\n// {0}\n'):
-        #         wfile(data)
+        def compress(res, name):
+            wfile = res.sendFile(200, name)
+            for data in concat_files(*(all_script), prefix_format='\n// {0}\n'):
+                wfile(data)
 
         file_scripts = open(txtpath, 'r', encoding='utf-8')
 
@@ -182,8 +188,9 @@ if __name__ == "__main__":
 
         file_scripts.close()
         httpd = Server(('localhost', 8000), ServerHandler)
-        # httpd.useHome("./www")
-        # httpd.setGet("/~every.js", lambda res: compress(res, "/~every.js"))
+        httpd.useStatic("./www")
+        httpd.setGet("/~every.js", lambda res: compress(res, "/~every.js"))
+        httpd.setPost("/query")
         httpd.start()
     except KeyboardInterrupt:
         print("Server stopped by user.")
