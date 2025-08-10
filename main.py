@@ -39,17 +39,22 @@
 # play(name="dad")
 # asdhioashjoidoaisd
 
+class app1():
+    def __init__(self):
+        self.init = False
 
-def test2(fns):
-    def wrapper(*args, **kwargs):
-        print(args, kwargs)
-        fns()
-    return wrapper
+    def send(self, msg: str):
+        print(msg)
+
+    def get(self, rute: str):
+        def msg(func):
+            func(self)
+        return msg
 
 
-@test2
-def rute():
-    print("init")
+app = app1()
 
 
-print(rute(), test2)
+@app.get("/")
+def rute(res):
+    res.send("ok")

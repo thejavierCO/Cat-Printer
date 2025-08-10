@@ -4,7 +4,7 @@ import sys
 import json
 import warnings
 import webbrowser
-from router import RoutherHandler
+from router import Rutas
 
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
@@ -35,43 +35,34 @@ def mime(url: str):
     return mime_type.get(url.rsplit('.', 1)[-1], mime_type['octet-stream'])
 
 
-class ServerPathHandler():
-    homedir = ""
-    paths = {}
-    buffer = 4 * 1024 * 1024
-    max_payload = buffer * 16
+# class ServerPathHandler():
+#     homedir = ""
+#     buffer = 4 * 1024 * 1024
+#     max_payload = buffer * 16
 
-    def get(self, path, handler):
-        self.paths[path] = [handler, 'GET']
-        return self
-
-    def post(self, path, handler):
-        self.paths[path] = [handler, 'POST']
-        return self
-
-    def handle_request(self, request, method, path):
-        # path, _, _args = path.partition('?')
-        # if self.homedir != "":
-        #     file_path = os.path.abspath(self.homedir+path)
-        #     if os.path.isfile(file_path):
-        #         return request.sendFileFormDirectory(200, file_path)
-        # if path in self.paths:
-        #     handler, expected_method = self.paths[path]
-        #     if method == expected_method:
-        #         if callable(handler):
-        #             return handler(request)
-        #         if isinstance(handler, str):
-        #             return request.send(200, handler)
-        #     else:
-        #         return request.send(405, f"Method {method} not allowed for {path}")
-        # if path.startswith("/"):
-        #     return request.sendFileFormDirectory(
-        #         200, os.path.abspath(file_path+"/index.html"))
-        return request.send(404, "Path Not Found")
+#     def handle_request(self, request, method, path):
+#         # path, _, _args = path.partition('?')
+#         # if self.homedir != "":
+#         #     file_path = os.path.abspath(self.homedir+path)
+#         #     if os.path.isfile(file_path):
+#         #         return request.sendFileFormDirectory(200, file_path)
+#         # if path in self.paths:
+#         #     handler, expected_method = self.paths[path]
+#         #     if method == expected_method:
+#         #         if callable(handler):
+#         #             return handler(request)
+#         #         if isinstance(handler, str):
+#         #             return request.send(200, handler)
+#         #     else:
+#         #         return request.send(405, f"Method {method} not allowed for {path}")
+#         # if path.startswith("/"):
+#         #     return request.sendFileFormDirectory(
+#         #         200, os.path.abspath(file_path+"/index.html"))
+#         return request.send(404, "Path Not Found")
 
 
 class ServerHandler(BaseHTTPRequestHandler):
-    server_path_handler = ServerPathHandler()
+    Rute = Rutas()
     buffer = 4 * 1024 * 1024
     max_payload = buffer * 16
 
@@ -105,7 +96,18 @@ class ServerHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         try:
-            self.server_path_handler.handle_request(self, 'GET', self.path)
+            @self.Rute.call(self.path)
+            def fnc(rute):
+                print(rute)
+                request.send(200, "test")
+                # expected_method, handler = rute
+                # if "GET" == expected_method:
+                #     if callable(handler):
+                #         return handler(request)
+                #     if isinstance(handler, str):
+                #         return request.send(200, handler)
+                # else:
+                #     return request.send(405, f"Method {method} not allowed for {path}")
         except json.JSONDecodeError:
             self.send(400, "Invalid JSON")
         except Exception as e:
@@ -113,7 +115,18 @@ class ServerHandler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         try:
-            self.server_path_handler.handle_request(self, 'POST', self.path)
+            @self.Rute.call(self.path)
+            def fnc(rute):
+                print(rute)
+                request.send(200, "test")
+                # expected_method, handler = rute
+                # if "GET" == expected_method:
+                #     if callable(handler):
+                #         return handler(request)
+                #     if isinstance(handler, str):
+                #         return request.send(200, handler)
+                # else:
+                #     return request.send(405, f"Method {method} not allowed for {path}")
         except json.JSONDecodeError:
             self.send(400, "Invalid JSON")
         except Exception as e:
@@ -133,18 +146,23 @@ class Server(HTTPServer):
             print(f"Error handling request: {str(e)}")
             request.close()
 
-    def use(self, handler: RoutherHandler):
+    def Get(self, path):
+        print(path)
 
-    def useStatic(self, directory):
-        self.RequestHandlerClass.server_path_handler.homedir = directory
+        @self.RequestHandlerClass.Rute.get(path)
+        def Alert():
+            if '-D' in sys.argv or '--debug' in sys.argv:
+                print(f'add rute:{path}')
+        return Alert
 
-    def setGet(self, path, handler):
-        self.RequestHandlerClass.server_path_handler.get(path, handler)
-        return self
+    def Post(self, path):
+        print(path)
 
-    def setPost(self, path, handler):
-        self.RequestHandlerClass.server_path_handler.post(path, handler)
-        return self
+        @self.RequestHandlerClass.Rute.post(path)
+        def Alert():
+            if '-D' in sys.argv or '--debug' in sys.argv:
+                print(f'add rute:{path}')
+        return Alert
 
     def open_browser(self):
         webbrowser.open(
@@ -191,7 +209,10 @@ if __name__ == "__main__":
         # file_scripts.close()
 
         Srv = Server(('localhost', 8000), ServerHandler)
-        Srv.use(RoutherHandler("GET", "/"))
+
+        @Srv.Get("/")
+        def Home(res):
+            print("tets")
         # Srv.setGet("/~every.js", lambda res: compress(res, "/~every.js"))
         # Srv.setPost("/print", "play")
         # Srv.setPost("/devices", "play")
@@ -199,7 +220,7 @@ if __name__ == "__main__":
         # Srv.setPost("/set", "play")
         # Srv.setPost("/connect", "play")
         # Srv.setPost("/exit", lambda res: sys.exit(0))
-        Srv.start()
+        # Srv.start()
     except KeyboardInterrupt:
         print("Server stopped by user.")
     except Exception as e:
