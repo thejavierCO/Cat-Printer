@@ -23,42 +23,13 @@ mime_type = {
 
 class DictAsObject(dict):
     " Let you use a dict like an object in JavaScript. "
-
     def __getattr__(self, key):
         return self.get(key, None)
-
     def __setattr__(self, key, value):
         self[key] = value
 
-
 def mime(url: str):
     return mime_type.get(url.rsplit('.', 1)[-1], mime_type['octet-stream'])
-
-
-# class ServerPathHandler():
-#     homedir = ""
-#     buffer = 4 * 1024 * 1024
-#     max_payload = buffer * 16
-
-#     def handle_request(self, request, method, path):
-#         # path, _, _args = path.partition('?')
-#         # if self.homedir != "":
-#         #     file_path = os.path.abspath(self.homedir+path)
-#         #     if os.path.isfile(file_path):
-#         #         return request.sendFileFormDirectory(200, file_path)
-#         # if path in self.paths:
-#         #     handler, expected_method = self.paths[path]
-#         #     if method == expected_method:
-#         #         if callable(handler):
-#         #             return handler(request)
-#         #         if isinstance(handler, str):
-#         #             return request.send(200, handler)
-#         #     else:
-#         #         return request.send(405, f"Method {method} not allowed for {path}")
-#         # if path.startswith("/"):
-#         #     return request.sendFileFormDirectory(
-#         #         200, os.path.abspath(file_path+"/index.html"))
-#         return request.send(404, "Path Not Found")
 
 
 class ServerHandler(BaseHTTPRequestHandler):
