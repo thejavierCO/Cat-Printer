@@ -2,28 +2,30 @@ class Rutas():
     paths = {}
 
     def call(self, path: str):
+        path, _, args = path.partition('?')
         if path in self.paths:
             def action(fns):
                 fns(self.paths[path])
             return action
-        else:
+        elif "/" in self.paths:
             def action(fns):
-                print("not exist action")
+                fns(self.paths["/"])
             return action
 
-    def use(self, method: str, path: str):
+
+    def use(self, method: str, path: str,action):
         def handler(fns):
-            self.paths[path] = [method, fns]
+            self.paths[path] = [method, action]
         return handler
 
-    def get(self, path: str):
+    def get(self, path: str,action):
         def handler(fns):
-            self.paths[path] = ["GET", fns]
+            self.paths[path] = ["GET", action]
             fns()
         return handler
 
-    def post(self, path: str):
+    def post(self, path: str,action):
         def handler(fns):
-            self.paths[path] = ["POST", fns]
+            self.paths[path] = ["POST", action]
             fns()
         return handler

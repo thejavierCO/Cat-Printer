@@ -98,16 +98,14 @@ class ServerHandler(BaseHTTPRequestHandler):
         try:
             @self.Rute.call(self.path)
             def fnc(rute):
-                print(rute)
-                request.send(200, "test")
-                # expected_method, handler = rute
-                # if "GET" == expected_method:
-                #     if callable(handler):
-                #         return handler(request)
-                #     if isinstance(handler, str):
-                #         return request.send(200, handler)
-                # else:
-                #     return request.send(405, f"Method {method} not allowed for {path}")
+                expected_method, handler = rute
+                if "GET" == expected_method:
+                    if callable(handler):
+                        return handler(self)
+                    if isinstance(handler, str):
+                        return self.send(200, handler)
+                else:
+                    return self.send(405, f"Method {method} not allowed for {path}")
         except json.JSONDecodeError:
             self.send(400, "Invalid JSON")
         except Exception as e:
@@ -117,16 +115,14 @@ class ServerHandler(BaseHTTPRequestHandler):
         try:
             @self.Rute.call(self.path)
             def fnc(rute):
-                print(rute)
-                request.send(200, "test")
-                # expected_method, handler = rute
-                # if "GET" == expected_method:
-                #     if callable(handler):
-                #         return handler(request)
-                #     if isinstance(handler, str):
-                #         return request.send(200, handler)
-                # else:
-                #     return request.send(405, f"Method {method} not allowed for {path}")
+                expected_method, handler = rute
+                if "POST" == expected_method:
+                    if callable(handler):
+                        return handler(self)
+                    if isinstance(handler, str):
+                        return self.send(200, handler)
+                else:
+                    return self.send(405, f"Method {method} not allowed for {path}")
         except json.JSONDecodeError:
             self.send(400, "Invalid JSON")
         except Exception as e:
@@ -145,24 +141,23 @@ class Server(HTTPServer):
         except Exception as e:
             print(f"Error handling request: {str(e)}")
             request.close()
-
     def Get(self, path):
-        print(path)
-
-        @self.RequestHandlerClass.Rute.get(path)
-        def Alert():
-            if '-D' in sys.argv or '--debug' in sys.argv:
-                print(f'add rute:{path}')
-        return Alert
+        def add(fns):
+            @self.RequestHandlerClass.Rute.get(path,fns)
+            def Alert():
+                if '-D' in sys.argv or '--debug' in sys.argv:
+                    print(f'add rute:{path}')
+            return Alert
+        return add
 
     def Post(self, path):
-        print(path)
-
-        @self.RequestHandlerClass.Rute.post(path)
-        def Alert():
-            if '-D' in sys.argv or '--debug' in sys.argv:
-                print(f'add rute:{path}')
-        return Alert
+        def add(fns):
+            @self.RequestHandlerClass.Rute.post(path,fns)
+            def Alert():
+                if '-D' in sys.argv or '--debug' in sys.argv:
+                    print(f'add rute:{path}')
+            return Alert
+        return add
 
     def open_browser(self):
         webbrowser.open(
@@ -184,43 +179,75 @@ class Server(HTTPServer):
 
 if __name__ == "__main__":
     try:
-        # all_script: list = []
-        # txtpath = os.path.abspath(os.path.join('www', 'all-scripts.txt'))
+        all_script: list = []
+        txtpath = os.path.abspath(os.path.join('www', 'all-scripts.txt'))
 
-        # def concat_files(*paths, prefix_format='', buffer=4 * 1024 * 1024) -> bytes:
-        #     for path in paths:
-        #         yield prefix_format.format(path).encode('utf-8')
-        #         with open(path, 'rb') as file:
-        #             while data := file.read(buffer):
-        #                 yield data
+        def concat_files(*paths, prefix_format='', buffer=4 * 1024 * 1024) -> bytes:
+            for path in paths:
+                yield prefix_format.format(path).encode('utf-8')
+                with open(path, 'rb') as file:
+                    while data := file.read(buffer):
+                        yield data
 
-        # def compress(res, name):
-        #     wfile = res.sendFile(200, name)
-        #     for data in concat_files(*(all_script), prefix_format='\n// {0}\n'):
-        #         wfile(data)
+        file_scripts = open(txtpath, 'r', encoding='utf-8')
+        for path in file_scripts.read().split('\n'):
+            if path != '':
+                init_path = os.path.join('www', path)
+                abspath = os.path.abspath(init_path)
+                all_script.append(abspath)
 
-        # file_scripts = open(txtpath, 'r', encoding='utf-8')
-        # for path in file_scripts.read().split('\n'):
-        #     if path != '':
-        #         init_path = os.path.join('www', path)
-        #         abspath = os.path.abspath(init_path)
-        #         all_script.append(abspath)
-
-        # file_scripts.close()
+        file_scripts.close()
 
         Srv = Server(('localhost', 8000), ServerHandler)
 
+        
+        @Srv.Post("/print")
+        def print_app(res):
+            print("query")
+            res.send(200,"test")
+
+        @Srv.Post("/devices")
+        def devices(res):
+            print("query")
+            res.send(200,"test")
+
+        @Srv.Post("/query")
+        def query(res):
+            print("query")
+            res.send(200,"test")
+
+        @Srv.Post("/set")
+        def set(res):
+            print("query")
+            res.send(200,"test")
+
+        @Srv.Post("/connect")
+        def connect(res):
+            print("query")
+            res.send(200,"test")
+
+        @Srv.Post("/exit")
+        def exist(res):
+            print("query")
+            res.send(200,"test")
+
+        @Srv.Get("/~every.js")
+        def compress(res):
+            wfile = res.sendFile(200, res.path)
+            for data in concat_files(*(all_script), prefix_format='\n// {0}\n'):
+                wfile(data)
+
         @Srv.Get("/")
         def Home(res):
-            print("tets")
-        # Srv.setGet("/~every.js", lambda res: compress(res, "/~every.js"))
-        # Srv.setPost("/print", "play")
-        # Srv.setPost("/devices", "play")
-        # Srv.setPost("/query", "play")
-        # Srv.setPost("/set", "play")
-        # Srv.setPost("/connect", "play")
-        # Srv.setPost("/exit", lambda res: sys.exit(0))
-        # Srv.start()
+            homedir = "./www"
+            path, _, args = res.path.partition('?')
+            file_path = os.path.abspath(homedir+path)
+            if os.path.isfile(file_path):
+                return res.sendFileFormDirectory(200, file_path)
+            if path.startswith("/"):
+                return res.sendFileFormDirectory(200, os.path.abspath(file_path+"/index.html"))
+            return res.send(404, "Path Not Found")
+        Srv.start()
     except KeyboardInterrupt:
         print("Server stopped by user.")
     except Exception as e:
