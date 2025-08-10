@@ -182,7 +182,6 @@ if __name__ == "__main__":
                 wfile(data)
 
         file_scripts = open(txtpath, 'r', encoding='utf-8')
-
         for path in file_scripts.read().split('\n'):
             if path != '':
                 init_path = os.path.join('www', path)
@@ -190,6 +189,7 @@ if __name__ == "__main__":
                 all_script.append(abspath)
 
         file_scripts.close()
+
         httpd = Server(('localhost', 8000), ServerHandler)
         httpd.useStatic("./www")
         httpd.setGet("/~every.js", lambda res: compress(res, "/~every.js"))
@@ -199,8 +199,6 @@ if __name__ == "__main__":
         httpd.setPost("/set", "play")
         httpd.setPost("/connect", "play")
         httpd.setPost("/exit", lambda res: sys.exit(0))
-        httpd.setGet(
-            "/exit", lambda res: (res.send(200, "close"), sys.exit(0)))
         httpd.start()
     except KeyboardInterrupt:
         print("Server stopped by user.")

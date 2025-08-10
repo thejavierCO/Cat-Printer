@@ -1,22 +1,55 @@
-import sys
-from pathlib import Path
+# import sys
+# from pathlib import Path
 
 
-def importpath(path):
-    strpath = str(path)
-    if not strpath.startswith("/"):
-        parent_path = Path(
-            sys._getframe().f_globals.get("__file__", ".")).parent
-        path = parent_path / path
-    else:
-        path = Path(path)
-    try:
-        sys.path.insert(0, str(path.parent))
-        module = __import__(path.stem)
-    finally:
-        sys.path.pop(0)
-    return module
+# def importpath(path):
+#     strpath = str(path)
+#     if not strpath.startswith("/"):
+#         parent_path = Path(
+#             sys._getframe().f_globals.get("__file__", ".")).parent
+#         path = parent_path / path
+#     else:
+#         path = Path(path)
+#     try:
+#         sys.path.insert(0, str(path.parent))
+#         module = __import__(path.stem)
+#     finally:
+#         sys.path.pop(0)
+#     return module
 
 
-server = importpath("./src/server.py")
-print(server.serve())
+# server = importpath("./src/server.py")
+# print(server.serve())
+
+# asdhioashjoidoaisd
+
+# def test(func):
+
+#     def wrapper(*args, **kwargs):
+#         print(args, kwargs)
+#         func("test")
+#     return wrapper
+
+
+# @test
+# def play(name):
+#     print("init "+name)
+
+
+# play(name="dad")
+# asdhioashjoidoaisd
+
+
+def test2(fns):
+    def wrapper(*args, **kwargs):
+        print(args, kwargs)
+        fns()
+    return wrapper
+
+
+@test2
+def rute():
+    print("init")
+
+
+print(rute(), test2)
