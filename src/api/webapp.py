@@ -23,10 +23,13 @@ mime_type = {
 
 class DictAsObject(dict):
     " Let you use a dict like an object in JavaScript. "
+
     def __getattr__(self, key):
         return self.get(key, None)
+
     def __setattr__(self, key, value):
         self[key] = value
+
 
 def mime(url: str):
     return mime_type.get(url.rsplit('.', 1)[-1], mime_type['octet-stream'])
@@ -64,6 +67,16 @@ class ServerHandler(BaseHTTPRequestHandler):
         self.send_header('Content-type', mime(file_path))
         self.end_headers()
         return lambda data: self.wfile.write(data)
+
+    def sendJson(self, status_code, body_json=None):
+        'Called when an API call is being considered successful'
+        self.send_response(status_code)
+        self.send_header('Content-Type', mime('json'))
+        self.end_headers()
+        if body_json is None:
+            self.wfile.write(b'{}')
+        else:
+            self.wfile.write(json.dumps(body_json).encode('utf-8'))
 
     def do_GET(self):
         try:
@@ -112,9 +125,10 @@ class Server(HTTPServer):
         except Exception as e:
             print(f"Error handling request: {str(e)}")
             request.close()
+
     def Get(self, path):
         def add(fns):
-            @self.RequestHandlerClass.Rute.get(path,fns)
+            @self.RequestHandlerClass.Rute.get(path, fns)
             def Alert():
                 if '-D' in sys.argv or '--debug' in sys.argv:
                     print(f'add rute:{path}')
@@ -123,7 +137,7 @@ class Server(HTTPServer):
 
     def Post(self, path):
         def add(fns):
-            @self.RequestHandlerClass.Rute.post(path,fns)
+            @self.RequestHandlerClass.Rute.post(path, fns)
             def Alert():
                 if '-D' in sys.argv or '--debug' in sys.argv:
                     print(f'add rute:{path}')
@@ -171,36 +185,35 @@ if __name__ == "__main__":
 
         Srv = Server(('localhost', 8000), ServerHandler)
 
-        
         @Srv.Post("/print")
         def print_app(res):
             print("query")
-            res.send(200,"test")
+            res.send(200, "test")
 
         @Srv.Post("/devices")
         def devices(res):
             print("query")
-            res.send(200,"test")
+            res.send(200, "test")
 
         @Srv.Post("/query")
         def query(res):
             print("query")
-            res.send(200,"test")
+            res.send(200, "test")
 
         @Srv.Post("/set")
         def set(res):
             print("query")
-            res.send(200,"test")
+            res.send(200, "test")
 
         @Srv.Post("/connect")
         def connect(res):
             print("query")
-            res.send(200,"test")
+            res.send(200, "test")
 
         @Srv.Post("/exit")
         def exist(res):
             print("query")
-            res.send(200,"test")
+            res.send(200, "test")
 
         @Srv.Get("/~every.js")
         def compress(res):

@@ -1,7 +1,10 @@
 import sys
 import os
+import json
 
 from pathlib import Path
+
+
 def importpath(path):
     strpath = str(path)
     if not strpath.startswith("/"):
@@ -19,10 +22,23 @@ def importpath(path):
 
 
 app = importpath("./src/api/webapp.py")
-printer = importpath("./src/printer.py")
+printer = importpath("./src/printerApi.py")
+PrinterApp = printer.PrinterHandler()
+
+
+class DictAsObject(dict):
+    " Let you use a dict like an object in JavaScript. "
+
+    def __getattr__(self, key):
+        return self.get(key, None)
+
+    def __setattr__(self, key, value):
+        self[key] = value
+
 
 all_script: list = []
 txtpath = os.path.abspath(os.path.join('www', 'all-scripts.txt'))
+
 
 def concat_files(*paths, prefix_format='', buffer=4 * 1024 * 1024) -> bytes:
     for path in paths:
@@ -31,6 +47,8 @@ def concat_files(*paths, prefix_format='', buffer=4 * 1024 * 1024) -> bytes:
             while data := file.read(buffer):
                 yield data
 
+
+PrinterApp.load_config()
 file_scripts = open(txtpath, 'r', encoding='utf-8')
 for path in file_scripts.read().split('\n'):
     if path != '':
@@ -40,38 +58,90 @@ for path in file_scripts.read().split('\n'):
 
 file_scripts.close()
 
+
 Srv = app.Server(('localhost', 8000), app.ServerHandler)
 
 
 @Srv.Post("/print")
 def print_app(res):
-    res.send(200,"test")
+    content_length = int(res.headers.get('Content-Length'))
+    body = res.rfile.read(content_length)
+    PrinterApp.update_printer()
+    PrinterApp.printer.print(io.BytesIO(body))
+    res.sendJson(200, {"status": "ok", "data": "Printed successfully"})
+
 
 @Srv.Post("/devices")
 def devices(res):
-    res.send(200,"test")
+    content_length = int(res.headers.get('Content-Length'))
+    body = res.rfile.read(content_length)
+    data = DictAsObject(json.loads(body))
+    PrinterApp.printer.connect(None)
+    devices_list = [{
+        'name': device.name,
+        'address': device.address
+    } for device in PrinterApp.printer.scan(everything=data.get('everything'))]
+    res.sendJson(200, {'devices': devices_list})
+
 
 @Srv.Post("/query")
 def query(res):
-    res.send(200,"test")
+    PrinterApp.load_config()
+    res.sendJson(200, PrinterApp.settings)
+
 
 @Srv.Post("/set")
 def set(res):
-    res.send(200,"test")
+    content_length = int(res.headers.get('Content-Length'))
+    body = res.rfile.read(content_length)
+    data = DictAsObject(json.loads(body))
+    for key in data:
+        PrinterApp.settings[key] = data[key]
+    PrinterApp.save_config()
+    PrinterApp.update_printer()
+    res.sendJson(200)
+
 
 @Srv.Post("/connect")
 def connect(res):
-    res.send(200,"test")
+    content_length = int(res.headers.get('Content-Length'))
+    body = res.rfile.read(content_length)
+    data = DictAsObject(json.loads(body))
+    name, address = data['device'].split(',')
+    if not name or not address:
+        res.sendJson(500, {
+            'name': 'InvalidDevice',
+            'details': 'Device name or address is empty'
+        })
+        return
+    if PrinterApp.printer.device is None:
+        PrinterApp.printer.connect(name, address)
+        res.sendJson(200, {
+            'status': 'ok',
+            'data': 'Connected to {} at {}'.format(name, address)
+        })
+        return
+    else:
+        PrinterApp.printer.connect(name, address)
+        res.sendJson(200, {
+            'status': 'ok',
+            'data': 'Reconnected to {} at {}'.format(name, address)
+        })
+        return
+
 
 @Srv.Post("/exit")
 def exist(res):
-    res.send(200,"test")
+    res.sendJson(200, {'status': 'ok'})
+    PrinterApp.exit()
+
 
 @Srv.Get("/~every.js")
 def compress(res):
     wfile = res.sendFile(200, res.path)
     for data in concat_files(*(all_script), prefix_format='\n// {0}\n'):
         wfile(data)
+
 
 @Srv.Get("/")
 def Home(res):
@@ -83,5 +153,6 @@ def Home(res):
     if path.startswith("/"):
         return res.sendFileFormDirectory(200, os.path.abspath(file_path+"/index.html"))
     return res.send(404, "Path Not Found")
+
 
 Srv.start()
