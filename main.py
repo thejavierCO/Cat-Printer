@@ -1,6 +1,7 @@
 import sys
 import os
 import json
+import io
 
 from pathlib import Path
 
@@ -21,11 +22,6 @@ def importpath(path):
     return module
 
 
-app = importpath("./src/api/webapp.py")
-printer = importpath("./src/printerApi.py")
-PrinterApp = printer.PrinterHandler()
-
-
 class DictAsObject(dict):
     " Let you use a dict like an object in JavaScript. "
 
@@ -35,6 +31,10 @@ class DictAsObject(dict):
     def __setattr__(self, key, value):
         self[key] = value
 
+
+app = importpath("./src/api/webapp.py")
+printer = importpath("./src/printerApi.py")
+PrinterApp = printer.PrinterHandler()
 
 all_script: list = []
 txtpath = os.path.abspath(os.path.join('www', 'all-scripts.txt'))
@@ -64,8 +64,8 @@ Srv = app.Server(('localhost', 8000), app.ServerHandler)
 
 @Srv.Post("/print")
 def print_app(res):
-    content_length = int(res.headers.get('Content-Length'))
-    body = res.rfile.read(content_length)
+    body = res.getBody()
+    # print(res)
     PrinterApp.update_printer()
     PrinterApp.printer.print(io.BytesIO(body))
     res.sendJson(200, {"status": "ok", "data": "Printed successfully"})
@@ -73,9 +73,7 @@ def print_app(res):
 
 @Srv.Post("/devices")
 def devices(res):
-    content_length = int(res.headers.get('Content-Length'))
-    body = res.rfile.read(content_length)
-    data = DictAsObject(json.loads(body))
+    data = DictAsObject(json.loads(res.getBody()))
     PrinterApp.printer.connect(None)
     devices_list = [{
         'name': device.name,
@@ -92,9 +90,7 @@ def query(res):
 
 @Srv.Post("/set")
 def set(res):
-    content_length = int(res.headers.get('Content-Length'))
-    body = res.rfile.read(content_length)
-    data = DictAsObject(json.loads(body))
+    data = DictAsObject(json.loads(res.getBody()))
     for key in data:
         PrinterApp.settings[key] = data[key]
     PrinterApp.save_config()
@@ -104,9 +100,7 @@ def set(res):
 
 @Srv.Post("/connect")
 def connect(res):
-    content_length = int(res.headers.get('Content-Length'))
-    body = res.rfile.read(content_length)
-    data = DictAsObject(json.loads(body))
+    data = DictAsObject(json.loads(res.getBody()))
     name, address = data['device'].split(',')
     if not name or not address:
         res.sendJson(500, {

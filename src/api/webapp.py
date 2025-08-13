@@ -78,6 +78,11 @@ class ServerHandler(BaseHTTPRequestHandler):
         else:
             self.wfile.write(json.dumps(body_json).encode('utf-8'))
 
+    def getBody(self):
+        content_length = int(self.headers.get('Content-Length'))
+        body = self.rfile.read(content_length)
+        return body
+
     def do_GET(self):
         try:
             @self.Rute.call(self.path)
@@ -164,62 +169,7 @@ class Server(HTTPServer):
 
 if __name__ == "__main__":
     try:
-        all_script: list = []
-        txtpath = os.path.abspath(os.path.join('www', 'all-scripts.txt'))
-
-        def concat_files(*paths, prefix_format='', buffer=4 * 1024 * 1024) -> bytes:
-            for path in paths:
-                yield prefix_format.format(path).encode('utf-8')
-                with open(path, 'rb') as file:
-                    while data := file.read(buffer):
-                        yield data
-
-        file_scripts = open(txtpath, 'r', encoding='utf-8')
-        for path in file_scripts.read().split('\n'):
-            if path != '':
-                init_path = os.path.join('www', path)
-                abspath = os.path.abspath(init_path)
-                all_script.append(abspath)
-
-        file_scripts.close()
-
         Srv = Server(('localhost', 8000), ServerHandler)
-
-        @Srv.Post("/print")
-        def print_app(res):
-            print("query")
-            res.send(200, "test")
-
-        @Srv.Post("/devices")
-        def devices(res):
-            print("query")
-            res.send(200, "test")
-
-        @Srv.Post("/query")
-        def query(res):
-            print("query")
-            res.send(200, "test")
-
-        @Srv.Post("/set")
-        def set(res):
-            print("query")
-            res.send(200, "test")
-
-        @Srv.Post("/connect")
-        def connect(res):
-            print("query")
-            res.send(200, "test")
-
-        @Srv.Post("/exit")
-        def exist(res):
-            print("query")
-            res.send(200, "test")
-
-        @Srv.Get("/~every.js")
-        def compress(res):
-            wfile = res.sendFile(200, res.path)
-            for data in concat_files(*(all_script), prefix_format='\n// {0}\n'):
-                wfile(data)
 
         @Srv.Get("/")
         def Home(res):

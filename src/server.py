@@ -18,7 +18,7 @@ import webbrowser
 # For now we can't use `ThreadingHTTPServer`
 from http.server import HTTPServer, BaseHTTPRequestHandler
 # import `printer` first, to diagnostic some common errors
-from printer import PrinterDriver, PrinterError, i18n, info
+from printer import PrinterDriver, PrinterError  # , i18n, info
 from bleak.exc import BleakDBusError, BleakError    # pylint: disable=wrong-import-order
 from printer_lib.ipp import IPP
 # Supress non-sense asyncio warnings
@@ -123,7 +123,7 @@ class PrinterServerHandler(BaseHTTPRequestHandler):
                 for data in concat_files(*(self.all_script), prefix_format='\n// {0}\n'):
                     self.wfile.write(data)
                 return path
-        path = './src/www' + path
+        path = './www' + path
         # not found
         if not os.path.isfile(path):
             self.send_response(404)
@@ -276,12 +276,13 @@ class PrinterServerHandler(BaseHTTPRequestHandler):
         'Called when server got a POST http request'
         content_length = int(self.headers.get('Content-Length', -1))
         if (content_length < -1 or
-            content_length > self.max_payload
-            ):
+                content_length > self.max_payload
+                ):
             return
         if self.headers.get('Content-Type') == 'application/ipp':
             if self.ipp is None:
                 self.ipp = IPP(self)
+                print(self.ipp)
             self.ipp.handle_ipp()
             return
         try:
@@ -341,11 +342,11 @@ class PrinterServer(HTTPServer):
         if self.handler is None:
             self.handler = self.handler_class(request, client_address, self)
             self.handler.load_config()
-            with open(os.path.join('src', 'www', 'all-scripts.txt'), 'r', encoding='utf-8') as file:
+            with open(os.path.join('www', 'all-scripts.txt'), 'r', encoding='utf-8') as file:
                 for path in file.read().split('\n'):
                     if path != '':
                         self.handler.all_script.append(
-                            os.path.join('src', 'www', path))
+                            os.path.join('www', path))
             return
         self.handler.__init__(request, client_address, self)
 
@@ -360,13 +361,13 @@ def serve():
     address, port = '127.0.0.1', 8095
     listen_all = False
     if '-a' in sys.argv:
-        info(i18n('will-listen-on-all-addresses'))
+        # info(i18n('will-listen-on-all-addresses'))
         listen_all = True
     server = PrinterServer(
         ('' if listen_all else address, port), PrinterServerHandler)
     service_url = f'http://{address}:{port}/'
 
-    info(i18n('serving-at-0', service_url))
+    # info(i18n('serving-at-0', service_url))
     if '-s' not in sys.argv and not IsAndroid:
         webbrowser.open(service_url)
     # Request required bluetooth permissions (Android 12+)

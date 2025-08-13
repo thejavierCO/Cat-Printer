@@ -43,6 +43,7 @@ class PrinterHandler():
     )
     all_script: list = []
     printer: PrinterDriver = PrinterDriver()
+    IPPHandler = IPP
     ipp: IPP = None
 
     def load_config(self):
