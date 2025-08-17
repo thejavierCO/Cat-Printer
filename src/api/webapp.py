@@ -4,7 +4,7 @@ import sys
 import json
 import warnings
 import webbrowser
-from router import Rutas
+from router import Rutas, Plugin
 
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
@@ -69,7 +69,6 @@ class ServerHandler(BaseHTTPRequestHandler):
         return lambda data: self.wfile.write(data)
 
     def sendJson(self, status_code, body_json=None):
-        'Called when an API call is being considered successful'
         self.send_response(status_code)
         self.send_header('Content-Type', mime('json'))
         self.end_headers()
@@ -85,16 +84,17 @@ class ServerHandler(BaseHTTPRequestHandler):
 
     def do_GET(self):
         try:
-            @self.Rute.call(self.path)
-            def fnc(rute):
-                expected_method, handler = rute
-                if "GET" == expected_method:
-                    if callable(handler):
-                        return handler(self)
-                    if isinstance(handler, str):
-                        return self.send(200, handler)
-                else:
-                    return self.send(405, f"Method {method} not allowed for {path}")
+            self.Rute.call(self, "GET")
+            # @self.Rute.call(self.path)
+            # def fnc(rute):
+            #     expected_method, handler = rute
+            #     if "GET" == expected_method or "All" == expected_method:
+            #         if callable(handler):
+            #             return handler(self)
+            #         if isinstance(handler, str):
+            #             return self.send(200, handler)
+            #     else:
+            #         return self.send(405, f"Method {method} not allowed for {path}")
         except json.JSONDecodeError:
             self.send(400, "Invalid JSON")
         except Exception as e:
@@ -102,16 +102,7 @@ class ServerHandler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         try:
-            @self.Rute.call(self.path)
-            def fnc(rute):
-                expected_method, handler = rute
-                if "POST" == expected_method:
-                    if callable(handler):
-                        return handler(self)
-                    if isinstance(handler, str):
-                        return self.send(200, handler)
-                else:
-                    return self.send(405, f"Method {method} not allowed for {path}")
+            self.Rute.call(self, "POST")
         except json.JSONDecodeError:
             self.send(400, "Invalid JSON")
         except Exception as e:
@@ -119,7 +110,7 @@ class ServerHandler(BaseHTTPRequestHandler):
 
     def log_request(self, _code=200, _size=0):
         if '-D' in sys.argv or '--debug' in sys.argv:
-            print(f'{self.command} {self.path} {_code} ')
+            print(f'{self.command} {self.path} {_code} {_size}')
         pass
 
 
@@ -139,6 +130,9 @@ class Server(HTTPServer):
                     print(f'add rute:{path}')
             return Alert
         return add
+
+    def Use(self, classhandler: Plugin):
+        self.RequestHandlerClass.Rute.use(classhandler)
 
     def Post(self, path):
         def add(fns):
@@ -171,16 +165,20 @@ if __name__ == "__main__":
     try:
         Srv = Server(('localhost', 8000), ServerHandler)
 
-        @Srv.Get("/")
-        def Home(res):
-            homedir = "./www"
-            path, _, args = res.path.partition('?')
-            file_path = os.path.abspath(homedir+path)
-            if os.path.isfile(file_path):
-                return res.sendFileFormDirectory(200, file_path)
-            if path.startswith("/"):
-                return res.sendFileFormDirectory(200, os.path.abspath(file_path+"/index.html"))
-            return res.send(404, "Path Not Found")
+        class test(Plugin):
+            "test"
+
+        Srv.Use(test)
+        # @Srv.Get("/")
+        # def Home(res):
+        #     homedir = "./www/old"
+        #     path, _, args = res.path.partition('?')
+        #     file_path = os.path.abspath(homedir+path)
+        #     if os.path.isfile(file_path):
+        #         return res.sendFileFormDirectory(200, file_path)
+        #     if path.startswith("/"):
+        #         return res.sendFileFormDirectory(200, os.path.abspath(file_path+"/index.html"))
+        #     return res.send(404, "Path Not Found")
         Srv.start()
     except KeyboardInterrupt:
         print("Server stopped by user.")
