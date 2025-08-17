@@ -37,7 +37,7 @@ printer = importpath("./src/printerApi.py")
 PrinterApp = printer.PrinterHandler()
 
 all_script: list = []
-txtpath = os.path.abspath(os.path.join('www',"old", 'all-scripts.txt'))
+txtpath = os.path.abspath(os.path.join('www', 'all-scripts.txt'))
 
 
 def concat_files(*paths, prefix_format='', buffer=4 * 1024 * 1024) -> bytes:

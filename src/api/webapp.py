@@ -2,7 +2,6 @@ import os
 import io
 import sys
 import json
-import warnings
 import webbrowser
 from router import Rutas, Plugin
 
@@ -40,20 +39,26 @@ class ServerHandler(BaseHTTPRequestHandler):
     buffer = 4 * 1024 * 1024
     max_payload = buffer * 16
 
-    def send(self, status_code, message):
+    def setHeaders(self, status_code, mimetype: str):
         self.send_response(status_code)
-        self.send_header('Content-type', 'application/json')
-        self.end_headers()
-        response = json.dumps({"message": message}).encode('utf-8')
-        self.wfile.write(response)
-        return self
+        self.send_header('Content-type', mimetype)
+
+        def action(fns):
+            fns(
+                lambda key, data: self.send_header(key, data),
+                lambda: self.end_headers()
+            )
+        return action
+
+    def defaultHeaders(self, status_code, mimetype: str):
+        @self.setHeaders(status_code, mimetype)
+        def action(add, end):
+            end()
 
     def sendFileFormDirectory(self, status_code, file_path):
         if not os.path.isfile(file_path):
-            return self.send(404, "Page Not Fount")
-        self.send_response(status_code)
-        self.send_header('Content-type', mime(file_path))
-        self.end_headers()
+            return self.sendJson(404, {"status": "error", "msg": "not fount"})
+        self.defaultHeaders(status_code, mime(file_path))
         file_data = open(file_path, 'rb')
         while True:
             chunk = file_data.read(self.buffer)
@@ -63,17 +68,13 @@ class ServerHandler(BaseHTTPRequestHandler):
         return lambda data: print("load file exist")
 
     def sendFile(self, status_code, file_path):
-        self.send_response(status_code)
-        self.send_header('Content-type', mime(file_path))
-        self.end_headers()
+        self.defaultHeaders(status_code, mime(file_path))
         return lambda data: self.wfile.write(data)
 
     def sendJson(self, status_code, body_json=None):
-        self.send_response(status_code)
-        self.send_header('Content-Type', mime('json'))
-        self.end_headers()
+        self.defaultHeaders(status_code, mime('json'))
         if body_json is None:
-            self.wfile.write(b'{}')
+            self.wfile.write(b"{}")
         else:
             self.wfile.write(json.dumps(body_json).encode('utf-8'))
 
@@ -85,16 +86,6 @@ class ServerHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         try:
             self.Rute.call(self, "GET")
-            # @self.Rute.call(self.path)
-            # def fnc(rute):
-            #     expected_method, handler = rute
-            #     if "GET" == expected_method or "All" == expected_method:
-            #         if callable(handler):
-            #             return handler(self)
-            #         if isinstance(handler, str):
-            #             return self.send(200, handler)
-            #     else:
-            #         return self.send(405, f"Method {method} not allowed for {path}")
         except json.JSONDecodeError:
             self.send(400, "Invalid JSON")
         except Exception as e:
@@ -109,8 +100,7 @@ class ServerHandler(BaseHTTPRequestHandler):
             self.send(500, f"Internal Server Error: {str(e)}")
 
     def log_request(self, _code=200, _size=0):
-        if '-D' in sys.argv or '--debug' in sys.argv:
-            print(f'{self.command} {self.path} {_code} {_size}')
+        self.Rute.Log(f'{self.command} {self.path} {_code} {_size}')
         pass
 
 
@@ -122,25 +112,17 @@ class Server(HTTPServer):
             print(f"Error handling request: {str(e)}")
             request.close()
 
+    def Use(self, *arg, **karg):
+        return self.RequestHandlerClass.Rute.use(*arg, **karg)
+
     def Get(self, path):
         def add(fns):
-            @self.RequestHandlerClass.Rute.get(path, fns)
-            def Alert():
-                if '-D' in sys.argv or '--debug' in sys.argv:
-                    print(f'add rute:{path}')
-            return Alert
+            self.RequestHandlerClass.Rute.set(path, "GET", fns)
         return add
-
-    def Use(self, classhandler: Plugin):
-        self.RequestHandlerClass.Rute.use(classhandler)
 
     def Post(self, path):
         def add(fns):
-            @self.RequestHandlerClass.Rute.post(path, fns)
-            def Alert():
-                if '-D' in sys.argv or '--debug' in sys.argv:
-                    print(f'add rute:{path}')
-            return Alert
+            self.RequestHandlerClass.Rute.set(path, "POST", fns)
         return add
 
     def open_browser(self):
@@ -165,20 +147,16 @@ if __name__ == "__main__":
     try:
         Srv = Server(('localhost', 8000), ServerHandler)
 
-        class test(Plugin):
-            "test"
-
-        Srv.Use(test)
-        # @Srv.Get("/")
-        # def Home(res):
-        #     homedir = "./www/old"
-        #     path, _, args = res.path.partition('?')
-        #     file_path = os.path.abspath(homedir+path)
-        #     if os.path.isfile(file_path):
-        #         return res.sendFileFormDirectory(200, file_path)
-        #     if path.startswith("/"):
-        #         return res.sendFileFormDirectory(200, os.path.abspath(file_path+"/index.html"))
-        #     return res.send(404, "Path Not Found")
+        @Srv.Get("/")
+        def Home(res):
+            homedir = "./www"
+            path, _, args = res.path.partition('?')
+            file_path = os.path.abspath(homedir+path)
+            if os.path.isfile(file_path):
+                return res.sendFileFormDirectory(200, file_path)
+            if path.startswith("/"):
+                return res.sendFileFormDirectory(200, os.path.abspath(file_path+"/index.html"))
+            return res.sendJson(404, {"status": "error", "msg": "not fount"})
         Srv.start()
     except KeyboardInterrupt:
         print("Server stopped by user.")

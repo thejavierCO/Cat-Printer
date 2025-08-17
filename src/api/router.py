@@ -1,6 +1,5 @@
 # import os
-
-
+import sys
 # class RutasEstaticas():
 #     def __init__(self, path: (str, None)):
 #         self.raiz = ""
@@ -10,70 +9,70 @@
 #         if os.path.isdir(os.path.abspath(self.raiz)):
 #             self.dir = os.listdir(os.path.abspath(self.raiz))
 
+
 class Plugin():
     def __init__(self):
         self.default = True
 
-    def preventDefault(self):
-        self.default = False
-
-    def install(self):
-        print("install")
+    def defaultResponse(self, res, msg: str = ""):
+        if self.default == True:
+            if msg != "":
+                self.log(msg)
+                res.sendJson(500, {"status": "error", "msg": msg})
+            else:
+                res.sendJson(500, {"status": "error"})
 
     def log(self, msg: str):
-        print("log")
+        if '-D' in sys.argv or '--debug' in sys.argv:
+            print(msg)
+        return self
 
 
 class Rutas():
     paths = {}
-    configs: list = []
+    config: Plugin = None
+    allowMethods: list = [
+        "POST",
+        "GET"
+    ]
+
+    def __init__(self):
+        self.config = Plugin()
+
+    def Log(self, msg):
+        if hasattr(self.config, "log"):
+            self.config.log(msg)
 
     def call(self, srv, method):
-        for config in self.configs:
-            if hasattr(config, "log"):
-                config.log(f"{method}:{srv.path}")
-            if hasattr(config, "default"):
-                if config.default == True:
-                    srv.sendJson(500, {"status": "error"})
-                # path, _, args = path.partition('?')
-                # if path in self.paths:
-                #     def action(fns):
-                #         fns(self.paths[path])
-                #     return action
-                # elif "/" in self.paths:
-                #     def action(fns):
-                #         fns(self.paths["/"])
-                #     return action
+        path, _, args = srv.path.partition('?')
+        if path in self.paths:
+            expected_method, handler = self.paths[path]
+        elif "/" in self.paths:
+            expected_method, handler = self.paths["/"]
+        else:
+            return self.config.defaultResponse(srv, f"Not exist path:{path}")
 
-    def use(self, classhandler: Plugin):
+        if expected_method in self.allowMethods:
+            if callable(handler):
+                return handler(srv)
+            if isinstance(handler, str):
+                return srv.send(200, handler)
+        else:
+            return self.config.defaultResponse(srv, f"Method {method} not allowed for {path}")
+
+    def use(self, rute, classhandler):
+        if classhandler is None:
+            if isinstance(rute, Plugin):
+                classhandler = rute
+            elif isinstance(rute, str):
+                return self.Log(f"rute is str")
+            elif rute is None:
+                return self.Log(f"default Plugin")
         start = classhandler()
-        self.configs.append(classhandler())
-        # def action(res):
-        #     directory = RutasEstaticas("./www")
+        if hasattr(start, "install"):
+            start.install(self)
+        self.config = start
 
-        # self.paths[path] = ["GET", lambda _: action(srv)]
-
-        def handler(fns):
-            fns()
-        return handler
-
-        # def use(self, path: str, action):
-        #     self.paths[path] = ["All", action]
-
-        #     def handler(fns):
-        #         fns()
-        #     return handler
-
-    def get(self, path: str, action):
-        self.paths[path] = ["GET", action]
-
-        def handler(fns):
-            fns()
-        return handler
-
-    def post(self, path: str, action):
-        self.paths[path] = ["POST", action]
-
-        def handler(fns):
-            fns()
-        return handler
+    def set(self, path: str, method: str, action):
+        self.paths[path] = [method, action]
+        self.Log(f"add: {method} {path}")
