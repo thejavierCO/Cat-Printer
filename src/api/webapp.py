@@ -58,11 +58,11 @@ class ServerHandler(BaseHTTPRequestHandler):
     def sendFileFormDirectory(self, status_code, file_path):
         if not os.path.isfile(file_path):
             return self.sendJson(404, {"status": "error", "msg": "not fount"})
-        self.defaultHeaders(status_code, mime(file_path))
+        wfile = self.sendFile(status_code, file_path)
         file_data = open(file_path, 'rb')
         while True:
             chunk = file_data.read(self.buffer)
-            if not self.wfile.write(chunk):
+            if not wfile(chunk):
                 break
         file_data.close()
         return lambda data: print("load file exist")
@@ -147,16 +147,19 @@ if __name__ == "__main__":
     try:
         Srv = Server(('localhost', 8000), ServerHandler)
 
-        @Srv.Get("/")
-        def Home(res):
-            homedir = "./www"
-            path, _, args = res.path.partition('?')
-            file_path = os.path.abspath(homedir+path)
-            if os.path.isfile(file_path):
-                return res.sendFileFormDirectory(200, file_path)
-            if path.startswith("/"):
-                return res.sendFileFormDirectory(200, os.path.abspath(file_path+"/index.html"))
-            return res.sendJson(404, {"status": "error", "msg": "not fount"})
+        @Srv.Use("/api")
+        class Api(Plugin):
+            "ashjdoajsd"
+        # @Srv.Get("/")
+        # def Home(res):
+        #     homedir = "./www"
+        #     path, _, args = res.path.partition('?')
+        #     file_path = os.path.abspath(homedir+path)
+        #     if os.path.isfile(file_path):
+        #         return res.sendFileFormDirectory(200, file_path)
+        #     if path.startswith("/"):
+        #         return res.sendFileFormDirectory(200, os.path.abspath(file_path+"/index.html"))
+        #     return res.sendJson(404, {"status": "error", "msg": "not fount"})
         Srv.start()
     except KeyboardInterrupt:
         print("Server stopped by user.")

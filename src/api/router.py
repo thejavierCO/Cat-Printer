@@ -22,6 +22,13 @@ class Plugin():
             else:
                 res.sendJson(500, {"status": "error"})
 
+    def install(self, raiz, path="/"):
+        if self.default == True:
+            @raiz.set(path, "GET")
+            def action(res):
+                self.defaultResponse(res, "default Response")
+        return self
+
     def log(self, msg: str):
         if '-D' in sys.argv or '--debug' in sys.argv:
             print(msg)
@@ -37,7 +44,7 @@ class Rutas():
     ]
 
     def __init__(self):
-        self.config = Plugin()
+        self.config = Plugin().install(self)
 
     def Log(self, msg):
         if hasattr(self.config, "log"):
@@ -60,19 +67,31 @@ class Rutas():
         else:
             return self.config.defaultResponse(srv, f"Method {method} not allowed for {path}")
 
-    def use(self, rute, classhandler):
+    def use(self, rute, classhandler=None):
         if classhandler is None:
             if isinstance(rute, Plugin):
                 classhandler = rute
             elif isinstance(rute, str):
-                return self.Log(f"rute is str")
+                def act(classhandler):
+                    start = classhandler()
+                    if hasattr(start, "install"):
+                        start.install(self, rute)
+                    self.config = start
+                return act
             elif rute is None:
                 return self.Log(f"default Plugin")
-        start = classhandler()
-        if hasattr(start, "install"):
-            start.install(self)
-        self.config = start
+        else:
+            start = classhandler()
+            if hasattr(start, "install"):
+                start.install(self)
+            self.config = start
 
-    def set(self, path: str, method: str, action):
-        self.paths[path] = [method, action]
-        self.Log(f"add: {method} {path}")
+    def set(self, path: str, method: str, action=None):
+        if action is None:
+            def act(fns):
+                self.paths[path] = [method, fns]
+            self.Log(f"add: {method} {path}")
+            return act
+        else:
+            self.paths[path] = [method, action]
+            self.Log(f"add: {method} {path}")
