@@ -1,6 +1,7 @@
 import warnings
 import os
 import json
+import sys
 
 from printer import PrinterDriver, PrinterError
 from bleak.exc import BleakDBusError, BleakError    # pylint: disable=wrong-import-order

@@ -8,9 +8,9 @@ type .\wvenv\Scripts\activate.bat > %inst_next%
 if defined venv_init (echo pip install -r requirements.txt >> %inst_next%)
 set venv_init=
 echo echo Testing environment >> %inst_next%
-py -c "print('py -c \x22with open(1, \x27wb\x27) as f: f.write(b\x27P4\\n384 0\\n\x27)\x22 | py printer.py -f MX06 -')" >> %inst_next%
+py -c "print('py -c \x22with open(1, \x27wb\x27) as f: f.write(b\x27P4\\n384 0\\n\x27)\x22 | py ./src/printer.py -f MX06 -')" >> %inst_next%
 type .\wvenv\Scripts\activate.bat > %server_bat%
-echo py server.py >> %server_bat%
+echo py ./src/server.py >> %server_bat%
 echo Run server.bat to start Cat-Printer
 :: cmd bails out just after activation in batch
 %inst_next%

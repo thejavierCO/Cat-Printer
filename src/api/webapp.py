@@ -87,17 +87,17 @@ class ServerHandler(BaseHTTPRequestHandler):
         try:
             self.Rute.call(self, "GET")
         except json.JSONDecodeError:
-            self.send(400, "Invalid JSON")
+            self.sendJson(400, "Invalid JSON")
         except Exception as e:
-            self.send(500, f"Internal Server Error: {str(e)}")
+            self.sendJson(500, f"Internal Server Error: {str(e)}")
 
     def do_POST(self):
         try:
             self.Rute.call(self, "POST")
         except json.JSONDecodeError:
-            self.send(400, "Invalid JSON")
+            self.sendJson(400, "Invalid JSON")
         except Exception as e:
-            self.send(500, f"Internal Server Error: {str(e)}")
+            self.sendJson(500, f"Internal Server Error: {str(e)}")
 
     def log_request(self, _code=200, _size=0):
         self.Rute.Log(f'{self.command} {self.path} {_code} {_size}')
@@ -147,19 +147,20 @@ if __name__ == "__main__":
     try:
         Srv = Server(('localhost', 8000), ServerHandler)
 
-        @Srv.Use("/api")
-        class Api(Plugin):
-            "ashjdoajsd"
-        # @Srv.Get("/")
-        # def Home(res):
-        #     homedir = "./www"
-        #     path, _, args = res.path.partition('?')
-        #     file_path = os.path.abspath(homedir+path)
-        #     if os.path.isfile(file_path):
-        #         return res.sendFileFormDirectory(200, file_path)
-        #     if path.startswith("/"):
-        #         return res.sendFileFormDirectory(200, os.path.abspath(file_path+"/index.html"))
-        #     return res.sendJson(404, {"status": "error", "msg": "not fount"})
+        # @Srv.Use("/api")
+        # class Api(Plugin):
+        #     "ashjdoajsd"
+        # # @Srv.Get("/")
+        # # def Home(res):
+        # #     homedir = "./www"
+        # #     path, _, args = res.path.partition('?')
+        # #     file_path = os.path.abspath(homedir+path)
+        # #     if os.path.isfile(file_path):
+        # #         return res.sendFileFormDirectory(200, file_path)
+        # #     if path.startswith("/"):
+        # #         return res.sendFileFormDirectory(200, os.path.abspath(file_path+"/index.html"))
+        # #     return res.sendJson(404, {"status": "error", "msg": "not fount"})
+
         Srv.start()
     except KeyboardInterrupt:
         print("Server stopped by user.")

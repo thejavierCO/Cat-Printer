@@ -1,97 +1,108 @@
 # import os
 import sys
-# class RutasEstaticas():
-#     def __init__(self, path: (str, None)):
-#         self.raiz = ""
-#         self.dir: list = []
-#         if path is None:
-#             self.raiz = "./www"
-#         if os.path.isdir(os.path.abspath(self.raiz)):
-#             self.dir = os.listdir(os.path.abspath(self.raiz))
-
-
-class Plugin():
-    def __init__(self):
-        self.default = True
-
-    def defaultResponse(self, res, msg: str = ""):
-        if self.default == True:
-            if msg != "":
-                self.log(msg)
-                res.sendJson(500, {"status": "error", "msg": msg})
-            else:
-                res.sendJson(500, {"status": "error"})
-
-    def install(self, raiz, path="/"):
-        if self.default == True:
-            @raiz.set(path, "GET")
-            def action(res):
-                self.defaultResponse(res, "default Response")
-        return self
-
-    def log(self, msg: str):
-        if '-D' in sys.argv or '--debug' in sys.argv:
-            print(msg)
-        return self
 
 
 class Rutas():
     paths = {}
-    config: Plugin = None
     allowMethods: list = [
         "POST",
         "GET"
     ]
 
     def __init__(self):
-        self.config = Plugin().install(self)
+        "loop"
 
     def Log(self, msg):
-        if hasattr(self.config, "log"):
-            self.config.log(msg)
+        if '-D' in sys.argv or '--debug' in sys.argv:
+            print(msg)
+        return self
 
-    def call(self, srv, method):
-        path, _, args = srv.path.partition('?')
-        if path in self.paths:
-            expected_method, handler = self.paths[path]
-        elif "/" in self.paths:
-            expected_method, handler = self.paths["/"]
-        else:
-            return self.config.defaultResponse(srv, f"Not exist path:{path}")
+    def call(self, path, method):
+        "loop"
+        # path, _, args = srv.path.partition('?')
+        # if path in self.paths:
+        #     expected_method, handler = self.paths[path]
+        # elif "/" in self.paths:
+        #     expected_method, handler = self.paths["/"]
+        # else:
+        #     return self.config.defaultResponse(srv, f"Not exist path:{path}")
 
-        if expected_method in self.allowMethods:
-            if callable(handler):
-                return handler(srv)
-            if isinstance(handler, str):
-                return srv.send(200, handler)
-        else:
-            return self.config.defaultResponse(srv, f"Method {method} not allowed for {path}")
+        # if expected_method in self.allowMethods:
+        #     if callable(handler):
+        #         return handler(srv)
+        #     if isinstance(handler, str):
+        #         return srv.send(200, handler)
+        # else:
+        #     return self.config.defaultResponse(srv, f"Method {method} not allowed for {path}")
 
-    def use(self, rute, classhandler=None):
-        if classhandler is None:
-            if isinstance(rute, Plugin):
-                classhandler = rute
-            elif isinstance(rute, str):
-                def act(classhandler):
-                    start = classhandler()
-                    if hasattr(start, "install"):
-                        start.install(self, rute)
-                    self.config = start
-                return act
-            elif rute is None:
-                return self.Log(f"default Plugin")
-        else:
-            start = classhandler()
-            if hasattr(start, "install"):
-                start.install(self)
-            self.config = start
+    def use(self, method: str):
+        def act(fn):
+            if not callable(fn):
+                raise Exception("Action must be callable")
+            elif fn.__class__ is type:
+                raise Exception("Class not allowed here")
+            else:
+                fn.isPath = True
+                fn.method = method
+                fn.name = fn.__name__
+                return fn
+        return act
 
     def set(self, path: str, method: str, action=None):
-        if action is None:
-            def act(fns):
-                self.paths[path] = [method, fns]
-            self.Log(f"add: {method} {path}")
+        if method not in self.allowMethods:
+            raise Exception(f"Method not allowed {method}")
+        if path in self.paths:
+            raise Exception(f"Path already exists {path}")
+
+        if action is None or not callable(action):
+            def act(action):
+                if not callable(action):
+                    raise Exception("Action must be callable")
+                if action.__class__ is type:
+                    start = action()
+                    paths = [fn for fn in dir(start) if callable(getattr(start, fn)) and hasattr(
+                        getattr(start, fn), "isPath") and getattr(start, fn).isPath]
+                    for fn in paths:
+                        action = getattr(start, fn)
+                        if fn == start.__class__.__name__:
+                            self.set(path, action.method, action)
+                            continue
+                        pth = f"{path}/{action.name}" if path != "/" else f"/{action.name}"
+                        self.set(pth, action.method, action)
+                else:
+                    self.set(path, method, action)
             return act
         else:
             self.paths[path] = [method, action]
-            self.Log(f"add: {method} {path}")
+            self.Log(f"{method}:{path} registered")
+
+    def get(self, path: str):
+        if path in self.paths:
+            return self.paths[path]
+        return None
+
+
+if __name__ == "__main__":
+    Main = Rutas()
+
+    @Main.set("/api", "GET")
+    class api():
+        @Main.use("GET")
+        def api(self):
+            return "home"
+
+        @Main.use("GET")
+        def query(self):
+            return "query"
+
+        @Main.use("GET")
+        def set(self):
+            return "set"
+
+        @Main.use("POST")
+        def print(self):
+            return "print"
+
+    @Main.set("/", "GET")
+    def Home():
+        return "Home"
