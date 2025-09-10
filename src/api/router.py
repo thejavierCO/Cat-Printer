@@ -60,6 +60,7 @@ class Rutas():
                     raise Exception("Action must be callable")
                 if action.__class__ is type:
                     start = action()
+                    start.use = self.use
                     paths = [fn for fn in dir(start) if callable(getattr(start, fn)) and hasattr(
                         getattr(start, fn), "isPath") and getattr(start, fn).isPath]
                     for fn in paths:
@@ -76,33 +77,21 @@ class Rutas():
             self.paths[path] = [method, action]
             self.Log(f"{method}:{path} registered")
 
-    def get(self, path: str):
-        if path in self.paths:
-            return self.paths[path]
-        return None
-
 
 if __name__ == "__main__":
     Main = Rutas()
 
-    @Main.set("/api", "GET")
+    @Main.set("/api")
     class api():
-        @Main.use("GET")
         def api(self):
             return "home"
-
-        @Main.use("GET")
         def query(self):
             return "query"
-
-        @Main.use("GET")
         def set(self):
             return "set"
-
-        @Main.use("POST")
         def print(self):
             return "print"
 
-    @Main.set("/", "GET")
+    @Main.set("/")
     def Home():
         return "Home"
