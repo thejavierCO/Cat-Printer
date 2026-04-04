@@ -77,21 +77,33 @@ class Rutas():
             self.paths[path] = [method, action]
             self.Log(f"{method}:{path} registered")
 
+    def get(self, path: str):
+        if path in self.paths:
+            return self.paths[path]
+        return None
+
 
 if __name__ == "__main__":
     Main = Rutas()
 
-    @Main.set("/api")
+    @Main.set("/api", "GET")
     class api():
+        @use("GET")
         def api(self):
             return "home"
+
+        @use("GET")
         def query(self):
             return "query"
+
+        @use("GET")
         def set(self):
             return "set"
+
+        @use("POST")
         def print(self):
             return "print"
 
-    @Main.set("/")
+    @Main.set("/", "GET")
     def Home():
         return "Home"

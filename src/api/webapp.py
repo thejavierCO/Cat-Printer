@@ -147,19 +147,11 @@ if __name__ == "__main__":
     try:
         Srv = Server(('localhost', 8000), ServerHandler)
 
-        # @Srv.Use("/api")
-        # class Api(Plugin):
-        #     "ashjdoajsd"
-        # # @Srv.Get("/")
-        # # def Home(res):
-        # #     homedir = "./www"
-        # #     path, _, args = res.path.partition('?')
-        # #     file_path = os.path.abspath(homedir+path)
-        # #     if os.path.isfile(file_path):
-        # #         return res.sendFileFormDirectory(200, file_path)
-        # #     if path.startswith("/"):
-        # #         return res.sendFileFormDirectory(200, os.path.abspath(file_path+"/index.html"))
-        # #     return res.sendJson(404, {"status": "error", "msg": "not fount"})
+        @Srv()
+        class api():
+            @use("GET")
+            def api(self):
+                return "home"
 
         Srv.start()
     except KeyboardInterrupt:
